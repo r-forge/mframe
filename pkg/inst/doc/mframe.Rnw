@@ -1,0 +1,201 @@
+% \VignetteIndexEntry{mframe Manual}
+% \VignetteDepends{mframe}
+% \VignetteKeywords{Sweave}
+% \VignettePackage{mframe}
+ 
+\documentclass[a4paper,12pt]{article}
+\usepackage[OT1]{fontenc}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]
+	{hyperref}
+\usepackage{Sweave}
+
+\newcommand{\R}{{\tt R}}
+\newcommand{\Rpkg}[1]{{\textit{#1}}}
+\newcommand{\Rclass}[1]{{\texttt{#1}}}
+\newcommand{\Robj}[1]{{\texttt{#1}}}
+\newcommand{\Rfun}[1]{{\texttt{#1}}}
+\newcommand{\code}[1]{{\texttt{#1}}}
+
+\title{Data Frames with Metadata}
+\author{Enrique Bengoechea 
+\url{enrique.bengoechea@credit-suisse.com}}
+	
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+	Package \Rpkg{mframe} includes three S3 classes that provide 
+	infrastructure for attaching metadata to data frames:
+	\Rclass{mframe}, \Rclass{dfMetadata} and \Rclass{varMetadata}.
+	
+	Metadata can be used to store arbitrary (user-defined)
+	information about each variable, but it also allows to change the
+	default behaviour of data frames via user-defined parameterization   
+	of type checking, coercion, data validation, default values, or 
+	row keys. 
+\end{abstract}
+
+%\tableofcontents
+
+\section{Introduction} 
+\label{sec:introduction}
+
+\Rclass{mframe} is an S3 class that extends \Rclass{data.frame}.     
+\Rclass{mframe}s behave mostly like data frames, with the following 
+differences:
+
+\begin{enumerate}
+	\item metadata with user-defined information about each variable is 
+	attached to the object. This information is synchronized with the data 
+	frame: the number of variables in the metadata always equals the
+	number of variables in the data frame, and they are always subsetted
+	and modified together.
+
+	\item metadata allows to alter several aspects of data frames behaviour 
+	in a parameterized way. Minimal programming is required for 
+	several common specialization tasks, like the ones described in the 
+	following points.
+	
+	\item the class of each variable is by default pre-specified. This means
+   	that all variable data will be automatically coerced to that class,
+   	unlike standard data frames which may modify the class of its variables  
+   	(and possibly lose data) if data from a different class is assigned to it 
+   	at any point during the session.
+   	Still, the standard data frame coercion mechanism can optionally be 
+   	activated on any variable. 
+   
+   	\item missing data (\code{NA}s) can be prevented from any variable. An 
+   	error will be raised if an \code{NA} value is set on such a "required data" 
+   	variable.
+   	
+   	\item a default value can be set for any variable. Whenever new rows
+   	are created but an explicit value for the variable is not provided, the
+   	default value will be assigned. 
+   	
+   	\item a row uniquenes constraint can be enforced by defining a key. 
+   	Much like primary keys in relational database tables, an error will be 
+   	raised if a new/modified row would produce a duplicated key in the
+   	data frame.  
+   	
+   	\item the set of columns can be fixed. In this case, an error is raised
+   	whenever a column is added whose name does not appear in the metadata. 
+% 	\item inter and intra-row validation contraints can be applied.     
+\end{enumerate}
+
+Currently, observation (row-level) metadata is not supported.
+
+\begin{verbatim}
+Two reasons: 1) avoid common mistakes (losing data), which normally produce
+a lot of "defensive code", and 2) facilitate adding
+contrains by minimizing the code required for it (also reduce amount of
+defensive code)
+
+References for common mistake of losing data:
+http://finzi.psych.upenn.edu/R/Rhelp02/archive/106288.html ([R] FW: Selecting 
+ undefined column of a data frame (was [BioC] read.phenoData vs 
+ read.AnnotatedDataFrame)
+ Read the answer: http://finzi.psych.upenn.edu/R/Rhelp02/archive/106293.html
+ "Because data frames 'must' have (column) names, they are a partial
+ exception and when the result is a data frame you get an error if it would
+ contain undefined columns.
+
+ But in the case of foo[, "FileName"], the result is a single column and so
+ will not have a name: there seems no reason to be different from
+
+ > foo[["FileName"]]
+ NULL
+ > foo$FileName
+ NULL
+
+ which similarly select a single column. At one time they were different
+ in R, for no documented reason." 
+
+http://finzi.psych.upenn.edu/R/Rhelp02/archive/16342.html (dataframe subsetting 
+behaviour) and the answers
+
+While at the same time keeping most advantages of data frames: flexibility,
+and the fact that most R software deals with them.
+
+Problems: performance. For most specific cases, use formal classes.
+ 		 
+Only uses S3. See AnnotatedDataFrame in package Biobase for similar ideas 
+implemented as S4 classes.
+
+Special effort has been made to allow input in many different ways: vectors,
+named lists, strings of classes.... 
+\end{verbatim}
+  		 
+\section{Basic Example}
+\label{sec:basic_example}
+
+An \Rclass{mframe} can be created in the same way as a data frame. The
+two first rows when the object is printed show some relevant metadata:
+<<loadLib, results = hide, echo = FALSE>>=
+library(mframe)
+@ %def 
+<<>>=
+dx <- data.frame(Num=1:3, Char=letters[1:3], Log=FALSE)
+mx <- mframe(Num=1:3, Char=letters[1:3], Log=FALSE)
+print(class(mx))
+print(mx)
+@ %def 
+In this case, the metadata is just inferred from the class of each column.
+It can be viewed using the \Rfun{metadata} method:
+<<>>=
+metadata(mx)
+@ %def
+
+When an \Rclass{mframe} is created without any additional parameters, the main 
+difference with a standard data frame is that new data values assigned
+to a variable are automatically coerced to the original variable's class. 
+Unlike data frames, where, for example, replacing a single element of column 
+\Robj{Z} by a character vector transforms the whole variable from logical to 
+character without any warning. This is a common source of bugs. 
+@ 
+<<>>=
+dx[2, "Log"] <- "Aargh!"
+dx$Log			## a character vector
+
+mx[2, "Log"] <- "Great!"
+mx$Log			## a logical vector
+@ %def
+We can always restore the default data frame coercion behaviour 
+by modifying the metadata associated to our data frame. Method \Rfun{varType} 
+Setting the variable type to \Robj{NA} makes the trick:
+@
+<<>>=
+varType(mx)
+varType(mx["Log"]) <- NA
+mx[2, "Log"] <- "back to default"
+mx$Log			## a character vector
+@ %def
+
+Let's now add some meta-information to the variables:
+<<>>=
+metadata(mx)$Num$label <- "Numeric column"
+metadata(mx)$Char$label <- "Character column"
+@ %def
+
+
+Let's see other ways to modify the metadata. We can disallow \Robj{NA}s for 
+any column using the required method:
+
+
+The default behaviour is that NAs are accepted:
+
+\section{Implementation Details}
+
+It adds
+a new attribute \Robj{metadata} to the data frame that is an object of
+class \Rclass{dfMetadata}. A \Robj{dfMetadata} is a list of objects of
+class \Rclass{varMetadata} each of which represents metadata for a variable 
+in the data frame, plus additional attributes for metadata that apply
+to the whole data frame. Observation or row-level metadata is not supported.    
+
+ 
+%\section{References}
+%\bibliographystyle{plain}
+%\bibliography{mframe}
+
+

@@ -1,0 +1,10 @@
+.project
+chm/*
+man/*
+sandbox/*
+inst/doc/*.tex
+inst/doc/*.aux
+inst/doc/*.pdf
+inst/doc/*.dvi
+inst/doc/*.log
+inst/doc/*.out

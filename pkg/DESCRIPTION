@@ -1,0 +1,19 @@
+Package: mframe
+Type: Package
+Title: Data Frames with Metadata
+Version: 0.0-1
+Date: 2009-06-08
+Author: Enrique Bengoechea <enrique.bengoechea@credit-suisse.com>,
+Maintainer: Enrique Bengoechea <enrique.bengoechea@credit-suisse.com>
+Description: 'mframe' is an S3 class that adds metadata to data frames.
+    Metadata is modelled with S3 classes 'varMetadata' and 'dfMetadata'
+    that accept user-defined per-variable metadata and also permit
+    parameterization of data frame operations with type checking,
+    validation, default values, or row keys.
+Depends: R (>= 2.8.1), methods
+Imports: ppTools
+Suggests: svUnit
+License: GPL-2
+LazyLoad: yes
+Collate: 'dfMetadata.R' 'generics.R' 'metadata.R' 'mframe.R'
+    'mframe_subset.R' 'varMetadata.R' 'zzz.R'
